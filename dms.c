@@ -4,12 +4,20 @@
 #include <ctype.h>
 #include <errno.h>
 
+#define DMS_PARSE_MAX_DELIMITERS 6
+#define DMS_PARSE_CLEANUP {int j; for (j = 0; j < DMS_PARSE_MAX_DELIMITERS; j++) {  \
+				if (delimiters[j] != NULL) {free(delimiters[j]);}} \
+			     free(input); }
+
+
 typedef enum {SUCCESS,
 	      INVALID_NUMBER_NUMERIC_COMPONENTS,
 	      NUMERIC_PARSE_ERROR,
-              TOO_MANY_CARDINAL_DIRECTIONS} dms_parser_state;
+              TOO_MANY_CARDINAL_DIRECTIONS,
+	      COORDINATES_NOT_SAME_FORMAT} dms_parser_state;
 
 dms_parser_state parse_dms(const char*, double*, double*);
+inline int is_cardinal(char a);
 
 int main() {	
 	FILE* infile = fopen("coords", "r");
@@ -34,6 +42,7 @@ int main() {
 				case INVALID_NUMBER_NUMERIC_COMPONENTS: printf("invalid # numeric components.\n"); break;
 	    			case NUMERIC_PARSE_ERROR: printf("numeric parse error\n"); break;
               			case TOO_MANY_CARDINAL_DIRECTIONS: printf("too many cardinal directions\n");  break;
+				case COORDINATES_NOT_SAME_FORMAT: printf("coordinates not same format\n"); break;
 				default: printf("unspecified parse error\n");
 			}
 		}		
@@ -47,64 +56,108 @@ int main() {
 	fclose(infile);
 	return 0;
 }
+
+inline int is_cardinal(char a) {
+	return a == 'N' || a == 'S' || a == 'E' || a == 'W';
+}
+
+int compare_delim(char* a, char* b) {
+	if (a == NULL || b == NULL) {
+		return 0;
+	}
+
+	while (*a != '\0' && *b != '\0') {
+		if (*a == *b || (is_cardinal(*a) && is_cardinal(*b))) {
+			*a++;
+			*b++;
+		} else {
+			return 0;
+		}
+	}
+	return *a == *b; /* both equal to '\0' */
+}
 			   
 dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 	typedef enum {NUMERIC, NON_NUMERIC} state;
 	char* input = strdup(orig_input);
 	char cur = input[0];
 	char* num_start = NULL; /* start point of a substring to extract */
-	
+	char* delim_start = NULL; /* start point of a delimiter to extract */	
+
+	int mode_strict = 1; /* delimiters must match exactly */
+
 	/* Use these to hold cardinal directions as they are encountered. */
 	char first_cardinal = 'A';
 	char second_cardinal = 'A';	
 	double numeric_components[6] = {0};
+	char* delimiters[DMS_PARSE_MAX_DELIMITERS] = {NULL};
 
 	double coord1 = 0;
 	double coord2 = 0;
 
 	state cur_state = NON_NUMERIC;
 	short component_idx = -1;
+	short delimiter_idx = -1;
 	size_t i;
 	
 	for (i = 0; cur != '\0'; i++) {
-		cur = input[i];
+		cur = input[i]; /* assigned after test condition, so loop will process once w/null byte */
 				
 		if (isdigit(cur) || cur == '.' || (cur == '-' && cur_state == NON_NUMERIC)) {
 			if (cur_state == NON_NUMERIC) {
+				/* End of a delimiter */
+				if (delim_start != NULL) {
+					char swap = input[i];
+					input[i] = '\0';
+					if (delimiter_idx > DMS_PARSE_MAX_DELIMITERS) {
+						DMS_PARSE_CLEANUP;
+						return COORDINATES_NOT_SAME_FORMAT;
+					}
+					delimiters[delimiter_idx] = strdup(delim_start);
+					input[i] = swap;
+					//printf("delim= \%s\n", delimiters[delimiter_idx]);
+					//free(delim);
+				}
+
 				/* Start of a number */
 				component_idx++;
 				if (component_idx > 5) {
-					free(input);
+					DMS_PARSE_CLEANUP;
 					return INVALID_NUMBER_NUMERIC_COMPONENTS;
 				}				
 				cur_state = NUMERIC;
 				num_start = &input[i];
 			}
 		} else {
-			if (cur == 'N' || cur == 'S' || cur == 'E' || cur == 'W') {
+			if (is_cardinal(cur)) {
 				if (first_cardinal == 'A') {
 					first_cardinal = cur;
 				} else if (second_cardinal == 'A') {
 					second_cardinal = cur;
 				} else {
-					free(input);
+					DMS_PARSE_CLEANUP;
 					return TOO_MANY_CARDINAL_DIRECTIONS;
 				}
 			}
 
-			if (cur_state == NUMERIC)
-			{
+			if (cur_state == NUMERIC) {
 				/* End of a number */
+				char swap = input[i];
 				cur_state = NON_NUMERIC;
+				delimiter_idx++;
 				input[i] = '\0';
-			
+				
 				/* Attempt to convert substring to double */
 				char* endptr;
 				numeric_components[component_idx] = strtod(num_start, &endptr);
 				if (endptr != NULL && endptr[0] != '\0') {
 					printf("Converting %s to float, got %f with endptr:  >%s<\n", num_start, numeric_components[component_idx], endptr);
+					DMS_PARSE_CLEANUP;
 					return NUMERIC_PARSE_ERROR;		
 				}
+
+				input[i] = swap; /* revert null char that was inserted */
+				delim_start = &input[i];
 			}
 		}		
 	}		
@@ -121,7 +174,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 		case 2: coord1 = numeric_components[0];
 			coord2 = numeric_components[1];			
 			break;
-		default: free(input);
+		default: DMS_PARSE_CLEANUP;
 			 return INVALID_NUMBER_NUMERIC_COMPONENTS; 
 	}
 	
@@ -135,8 +188,28 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 		*lat = (coord1 > 0 && first_cardinal  == 'S' ? -1*coord1 : coord1);
 		*lon = (coord2 > 0 && second_cardinal == 'W' ? -1*coord2 : coord2);
 	}
-		
-	free(input);
+
+	/* If we're in "strict mode", make sure that the coordinates had the same delimiter structure. 
+	   This is to prevent cases like this from being output: 32°26′46″ N 122.61458° W */
+	if (mode_strict) {
+		short delimiters_match = 1;
+		switch (component_idx + 1) {
+			case 6: /* Compare delimiters between D/M and M/S */
+				delimiters_match = (compare_delim(delimiters[0], delimiters[3]) &&
+				                    compare_delim(delimiters[1], delimiters[4]));
+				break;
+			case 4: /* Compare delimiters between D/M only */
+				delimiters_match = (compare_delim(delimiters[0], delimiters[2]) &&
+					            compare_delim(delimiters[1], delimiters[4]));
+				break;
+		}
+		if (!delimiters_match) {
+			DMS_PARSE_CLEANUP;
+			return COORDINATES_NOT_SAME_FORMAT;
+		}
+	}
+	
+	DMS_PARSE_CLEANUP;
 	return SUCCESS;
 }
  
