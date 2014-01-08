@@ -1,0 +1,32 @@
+; ST_AsLatLonText Help page examples */
+2°19'29.928"S 3°14'3.243"W
+2 degrees, 19 minutes, 30 seconds to the S 3 degrees, 14 minutes, 3 seconds to the W
+-2°19'29.928" -3°14'3.243"
+2.3250 degrees S 3.2342 degrees W
+; Google Maps copy paste */
+44° 8.156', -72° 16.194'
+; Maptools
+32° 18' 23.1" N 122° 36' 52.5" W 
+32° 18.385' N 122° 36.875' W 
+32.30642° N 122.61458° W
++32.30642, -122.61458
+the coordinates were 122° 36' 52.5" W and 32° 18'	 23.1" N 
+; Wikipedia */
+40:26:46.302N 079:58:55.903W
+40°26′46″N 079°58′56″W
+40d 26′ 46″ N 079d 58′ 56″ W
+40.446195N 79.982195W
+40.446195, -79.982195
+40.446195,-79.982195
+40° 26.7717, -79° 58.93172
+N40:26:46.302 W079:58:55.903
+N40°26′46″ W079°58′56″
+N40d 26′ 46″ W079d 58′ 56″
+N40.446195 W79.982195
+; these should fail
+32.30642° NE 122.61458° W (problem is too many cardinal directions)
+32°23.45' N 122.61458° W (problem is differing numbers of components DM vs D)
+N40d 26′ 46″ W079d 58′ 56″ 24ms (problem is too many components)
+40.446.195, -79.982195 (unparseable number)
+; it would be nice if these failed, but they don't.
+32°26′46″ N 122.61458° W
