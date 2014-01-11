@@ -10,6 +10,9 @@
 				if (delimiters[j] != NULL) {free(delimiters[j]);}} \
 			     free(input); }
 
+#define COMPARE_DELIM_ADVANCE(ptr) while( ++*ptr == ' ') {}
+
+
 static int compare_delim(char*, char*);
 static inline int is_cardinal(char a);
 
@@ -24,12 +27,13 @@ static int compare_delim(char* a, char* b) {
 		return 0;
 	}
 
-	/* Consider delimiter strings equal if they are the same length, and all
-	   non-cardinal characters are the same. */
+	/* Consider delimiter strings equal if they have the same number of
+	   non-space characetres, and all non-space and non-cardinal 
+ 	   characters are the same. */
 	while (*a != '\0' && *b != '\0') {
 		if (*a == *b || (is_cardinal(*a) && is_cardinal(*b))) {
-			a++;
-			b++;
+			COMPARE_DELIM_ADVANCE(a);
+			COMPARE_DELIM_ADVANCE(b);
 		} else {
 			return 0;
 		}
