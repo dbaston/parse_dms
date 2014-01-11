@@ -3,12 +3,16 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "parse_dms.h"
-
+	
 #define DMS_PARSE_MAX_NUMERIC_COMPONENTS 6
 #define DMS_PARSE_MAX_DELIMITERS 6
-#define DMS_PARSE_CLEANUP {int j; for (j = 0; j < DMS_PARSE_MAX_DELIMITERS; j++) {  \
-				if (delimiters[j] != NULL) {free(delimiters[j]);}} \
-			     free(input); }
+#define DMS_PARSE_CLEANUP() \
+{int j; for (j = 0; j < DMS_PARSE_MAX_DELIMITERS; j++) {  \
+	if (delimiters[j] != NULL) { \
+		free(delimiters[j]); \
+	} \
+} \
+free(input); }
 
 #define COMPARE_DELIM_ADVANCE(ptr) while( ++*ptr == ' ') {}
 
@@ -28,7 +32,7 @@ static int compare_delim(char* a, char* b) {
 	}
 
 	/* Consider delimiter strings equal if they have the same number of
-	   non-space characetres, and all non-space and non-cardinal 
+	   non-space characeters, and all non-space and non-cardinal 
  	   characters are the same. */
 	while (*a != '\0' && *b != '\0') {
 		if (*a == *b || (is_cardinal(*a) && is_cardinal(*b))) {
@@ -74,7 +78,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 					char swap = input[i];
 					input[i] = '\0';
 					if (delimiter_idx + 1 > DMS_PARSE_MAX_DELIMITERS) {
-						DMS_PARSE_CLEANUP;
+						DMS_PARSE_CLEANUP();
 						return COORDINATES_NOT_SAME_FORMAT;
 					}
 					delimiters[delimiter_idx] = strdup(delim_start);
@@ -86,7 +90,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 				/* Start of a number */
 				component_idx++;
 				if (component_idx + 1 > DMS_PARSE_MAX_NUMERIC_COMPONENTS) {
-					DMS_PARSE_CLEANUP;
+					DMS_PARSE_CLEANUP();
 					return INVALID_NUMBER_NUMERIC_COMPONENTS;
 				}				
 				cur_state = NUMERIC;
@@ -99,7 +103,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 				} else if (second_cardinal == 'A') {
 					second_cardinal = cur;
 				} else {
-					DMS_PARSE_CLEANUP;
+					DMS_PARSE_CLEANUP();
 					return TOO_MANY_CARDINAL_DIRECTIONS;
 				}
 			}
@@ -116,7 +120,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 				numeric_components[component_idx] = strtod(num_start, &endptr);
 				if (endptr != NULL && endptr[0] != '\0') {
 					//printf("Converting %s to float, got %f with endptr:  >%s<\n", num_start, numeric_components[component_idx], endptr);
-					DMS_PARSE_CLEANUP;
+					DMS_PARSE_CLEANUP();
 					return NUMERIC_PARSE_ERROR;		
 				}
 
@@ -138,7 +142,7 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 		case 2: coord1 = numeric_components[0];
 			coord2 = numeric_components[1];			
 			break;
-		default: DMS_PARSE_CLEANUP;
+		default: DMS_PARSE_CLEANUP();
 			 return INVALID_NUMBER_NUMERIC_COMPONENTS; 
 	}
 	
@@ -168,12 +172,12 @@ dms_parser_state parse_dms(const char* orig_input, double* lat, double* lon) {
 				break;
 		}
 		if (!delimiters_match) {
-			DMS_PARSE_CLEANUP;
+			DMS_PARSE_CLEANUP();
 			return COORDINATES_NOT_SAME_FORMAT;
 		}
 	}
 	
-	DMS_PARSE_CLEANUP;
+	DMS_PARSE_CLEANUP();
 	return SUCCESS;
 }
  
