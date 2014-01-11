@@ -23,10 +23,10 @@ N40:26:46.302 W079:58:55.903
 N40°26′46″ W079°58′56″
 N40d 26′ 46″ W079d 58′ 56″
 N40.446195 W79.982195
+-16 deg. 23.44 min. S, -44 deg. 32.2 min. W 
 ; these should fail
 32.30642° NE 122.61458° W (problem is too many cardinal directions)
 32°23.45' N 122.61458° W (problem is differing numbers of components DM vs D)
 N40d 26′ 46″ W079d 58′ 56″ 24ms (problem is too many components)
 40.446.195, -79.982195 (unparseable number)
-; it would be nice if these failed, but they don't.
-32°26′46″ N 122.61458° W
+32°26′46″ N 122.61458° W (inconsistent format)
